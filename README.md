@@ -31,7 +31,7 @@ Transport timeouts, connection errors, HTTP errors, invalid JSON, and unexpected
 Requires Python 3.10+ and `uv` (or another PEP 517 package installer).
 
 ```bash
-cd /home/stephen/projects/jev_mcp
+cd /home/user/projects/jev_mcp
 uv sync
 uv run kev-mcp-server
 ```
@@ -49,7 +49,7 @@ Add this entry to `~/.hermes/config.yaml` under `mcp_servers` (merge it with exi
 ```yaml
 mcp_servers:
   kev:
-    command: "/home/stephen/projects/jev_mcp/run-stdio.sh"
+    command: "/home/user/projects/jev_mcp/run-stdio.sh"
     timeout: 90
     connect_timeout: 30
 ```
@@ -57,7 +57,7 @@ mcp_servers:
 The executable wrapper pins the stdio launch command and avoids argument-list serialization differences between Hermes versions. The server has already been registered in this Hermes profile using:
 
 ```bash
-hermes config set mcp_servers.kev.command /home/stephen/projects/jev_mcp/run-stdio.sh
+hermes config set mcp_servers.kev.command /home/user/projects/jev_mcp/run-stdio.sh
 hermes mcp test kev
 ```
 
@@ -68,7 +68,7 @@ Other MCP hosts can launch the same stdio command directly. For Claude Desktop, 
   "mcpServers": {
     "kev": {
       "command": "uv",
-      "args": ["--directory", "/home/stephen/projects/jev_mcp", "run", "kev-mcp-server"]
+      "args": ["--directory", "/home/user/projects/jev_mcp", "run", "kev-mcp-server"]
     }
   }
 }
