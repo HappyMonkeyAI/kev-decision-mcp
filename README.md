@@ -1,6 +1,6 @@
 # Kev MCP Server
 
-A small stdio FastMCP adapter exposing the Kev pointer-head decision API at `http://192.168.5.232:8008` as four agent tools. The model identifier is intentionally fixed to `kev-latest` for decision calls; this is not a text-generation interface.
+A small stdio FastMCP adapter exposing the Kev pointer-head decision API at `http://127.0.0.1:8008` as four agent tools. The model identifier is intentionally fixed to `kev-latest` for decision calls; this is not a text-generation interface.
 
 ## Tools
 
