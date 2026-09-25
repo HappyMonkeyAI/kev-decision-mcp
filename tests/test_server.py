@@ -158,14 +158,28 @@ def test_transport_rejects_invalid_values(argv, env):
         server._transport_config(argv, env)
 
 
-def test_main_configures_http_transport(monkeypatch):
+@pytest.fixture
+def http_env(monkeypatch):
+    """Capture uvicorn.run instead of serving, and isolate FastMCP settings and auth env."""
+    import uvicorn
+
     ran = []
-    monkeypatch.setattr(server.mcp, "run", lambda transport: ran.append(transport))
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: ran.append((app, kwargs)))
+    monkeypatch.setattr(server.mcp, "run", lambda transport: ran.append(("mcp.run", transport)))
     monkeypatch.setattr(server.mcp, "settings", server.mcp.settings.model_copy())
+    for name in ("KEV_MCP_ALLOWED_HOSTS", "KEV_MCP_ALLOWED_ORIGINS", "KEV_MCP_AUTH_TOKEN", "KEV_MCP_AUTH_TOKEN_FILE"):
+        monkeypatch.delenv(name, raising=False)
+    return ran
+
+
+def test_main_configures_http_transport(monkeypatch, http_env):
     monkeypatch.setenv("KEV_MCP_ALLOWED_HOSTS", "192.168.5.80:9001, kev-box:9001")
     monkeypatch.setenv("KEV_MCP_ALLOWED_ORIGINS", "http://localhost:3000")
     server.main(["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "9001"])
-    assert ran == ["streamable-http"]
+    assert len(http_env) == 1
+    app, kwargs = http_env[0]
+    assert (kwargs["host"], kwargs["port"]) == ("0.0.0.0", 9001)
+    assert not isinstance(app, server.BearerAuthMiddleware)
     assert (server.mcp.settings.host, server.mcp.settings.port) == ("0.0.0.0", 9001)
     security = server.mcp.settings.transport_security
     assert security is not None
@@ -174,11 +188,114 @@ def test_main_configures_http_transport(monkeypatch):
     assert security.allowed_origins == ["http://localhost:3000"]
 
 
-def test_non_loopback_http_requires_allowed_hosts(monkeypatch):
-    ran = []
-    monkeypatch.setattr(server.mcp, "run", lambda transport: ran.append(transport))
-    monkeypatch.setattr(server.mcp, "settings", server.mcp.settings.model_copy())
-    monkeypatch.delenv("KEV_MCP_ALLOWED_HOSTS", raising=False)
+def test_non_loopback_http_requires_allowed_hosts(http_env):
     with pytest.raises(SystemExit, match="require KEV_MCP_ALLOWED_HOSTS"):
         server.main(["--transport", "streamable-http", "--host", "0.0.0.0"])
-    assert ran == []
+    assert http_env == []
+
+
+def test_loopback_http_keeps_defaults_and_accepts_extra_hosts(monkeypatch, http_env):
+    monkeypatch.setenv("KEV_MCP_ALLOWED_HOSTS", "kev.example.com")
+    server.main(["--transport", "streamable-http"])
+    security = server.mcp.settings.transport_security
+    assert security.enable_dns_rebinding_protection is True
+    assert security.allowed_hosts == server.LOOPBACK_ALLOWED_HOSTS + ["kev.example.com"]
+    assert security.allowed_origins == server.LOOPBACK_ALLOWED_ORIGINS
+
+
+def test_http_with_token_file_wraps_app(tmp_path, monkeypatch, http_env):
+    token_file = tmp_path / "token"
+    token_file.write_text("s3cret\n")
+    monkeypatch.setenv("KEV_MCP_AUTH_TOKEN_FILE", str(token_file))
+    server.main(["--transport", "streamable-http"])
+    app, _ = http_env[0]
+    assert isinstance(app, server.BearerAuthMiddleware)
+    assert app._expected == b"s3cret"
+
+
+def test_http_without_token_logs_warning(http_env, caplog):
+    with caplog.at_level("WARNING", logger="kev_mcp_server"):
+        server.main(["--transport", "streamable-http"])
+    assert "WITHOUT authentication" in caplog.text
+
+
+def test_stdio_ignores_auth(monkeypatch, http_env):
+    monkeypatch.setenv("KEV_MCP_AUTH_TOKEN", "abc")
+    server.main([])
+    assert http_env == [("mcp.run", "stdio")]
+
+
+def test_auth_token_sources(tmp_path):
+    f = tmp_path / "t"
+    f.write_text("  from-file \n")
+    assert server._auth_token({}) is None
+    assert server._auth_token({"KEV_MCP_AUTH_TOKEN_FILE": str(f)}) == "from-file"
+    assert server._auth_token({"KEV_MCP_AUTH_TOKEN": "env", "KEV_MCP_AUTH_TOKEN_FILE": str(f)}) == "env"
+    with pytest.raises(SystemExit):
+        server._auth_token({"KEV_MCP_AUTH_TOKEN_FILE": str(tmp_path / "missing")})
+    (tmp_path / "empty").write_text("\n")
+    with pytest.raises(SystemExit):
+        server._auth_token({"KEV_MCP_AUTH_TOKEN_FILE": str(tmp_path / "empty")})
+
+
+async def _ok_app(scope, receive, send):
+    await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"text/plain")]})
+    await send({"type": "http.response.body", "body": b"ok"})
+
+
+def _asgi_get(app, headers=None, *, path="/mcp", method="POST"):
+    import asyncio
+
+    async def go():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8765") as client:
+            return await client.request(method, path, headers=headers or {}, content=b"{}")
+
+    return asyncio.run(go())
+
+
+def test_bearer_middleware_accepts_correct_token():
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), {"Authorization": "Bearer tok"})
+    assert resp.status_code == 200 and resp.text == "ok"
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), {"Authorization": "bearer tok"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer wrong"}, {"Authorization": "Basic tok"}, {"Authorization": "Bearer"}, {"Authorization": "tok"}])
+def test_bearer_middleware_rejects_missing_or_wrong_token(headers):
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), headers)
+    assert resp.status_code == 401
+    assert resp.json()["error"] == "unauthorized"
+    assert resp.headers["www-authenticate"].startswith("Bearer")
+
+
+@pytest.mark.parametrize("path", ["/mcp", "/mcp/", "/MCP", "/health", "/openapi.json", "/other?x=1"])
+@pytest.mark.parametrize("method", ["GET", "POST", "OPTIONS"])
+def test_bearer_middleware_protects_all_http_paths_and_methods(path, method):
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), path=path, method=method)
+    assert resp.status_code == 401
+
+
+def test_bearer_middleware_rejects_duplicate_authorization_headers():
+    headers = [("Authorization", "Bearer tok"), ("authorization", "Bearer wrong")]
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), headers)
+    assert resp.status_code == 401
+
+
+def test_no_token_passthrough():
+    assert server.build_http_app(None).__class__.__name__ == "Starlette"
+    assert _asgi_get(_ok_app).status_code == 200
+    with pytest.raises(ValueError):
+        server.BearerAuthMiddleware(_ok_app, "")
+
+
+def test_bearer_middleware_passes_lifespan():
+    import asyncio
+
+    seen = []
+
+    async def app(scope, receive, send):
+        seen.append(scope["type"])
+
+    asyncio.run(server.BearerAuthMiddleware(app, "tok")({"type": "lifespan"}, None, None))
+    assert seen == ["lifespan"]
