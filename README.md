@@ -59,6 +59,10 @@ Transport timeouts, connection errors, HTTP errors, invalid JSON, and unexpected
 | `KEV_MCP_TRANSPORT` | `stdio` | MCP transport: `stdio` or `streamable-http` (same as `--transport`). |
 | `KEV_MCP_HOST` | `127.0.0.1` | Bind host for `streamable-http` (same as `--host`). |
 | `KEV_MCP_PORT` | `8765` | Bind port for `streamable-http` (same as `--port`). |
+| `KEV_MCP_AUTH_TOKEN` | unset | Optional bearer token for `streamable-http`. When set, every HTTP request must send `Authorization: Bearer <token>`; others get `401` JSON. Ignored for stdio. |
+| `KEV_MCP_AUTH_TOKEN_FILE` | unset | Path to a file containing the bearer token (whitespace trimmed). Used when `KEV_MCP_AUTH_TOKEN` is unset. |
+| `KEV_MCP_ALLOWED_HOSTS` | unset | Comma-separated extra `Host` header values accepted by DNS-rebinding protection. Required for non-loopback binds; on loopback binds it extends the default `127.0.0.1:*`, `localhost:*`, `[::1]:*`. |
+| `KEV_MCP_ALLOWED_ORIGINS` | unset | Comma-separated extra `Origin` values accepted (browser clients only). |
 
 Command-line flags take precedence over environment variables.
 
@@ -98,7 +102,32 @@ KEV_MCP_ALLOWED_HOSTS=192.168.5.80:8765 \
 uv run kev-mcp-server
 ```
 
-The MCP endpoint is `/mcp`. **There is no authentication**: keep the default `127.0.0.1` bind unless you need remote clients, and only bind to `0.0.0.0` (or a LAN address) on a trusted network. Non-loopback binds require `KEV_MCP_ALLOWED_HOSTS`, a comma-separated list of exact `Host` header values accepted by FastMCP (for example, `192.168.5.80:8765`). Host and Origin validation remains enabled to protect against DNS rebinding; set the optional comma-separated `KEV_MCP_ALLOWED_ORIGINS` when browser clients need specific origins. Requests without an `Origin` header are allowed by FastMCP.
+The MCP endpoint is `/mcp`. Authentication is **off unless `KEV_MCP_AUTH_TOKEN` or `KEV_MCP_AUTH_TOKEN_FILE` is set** (the server logs a warning when HTTP runs without a token). With a token, every request must carry `Authorization: Bearer <token>` (compared in constant time); anything else gets `401` with a JSON body. Keep the default `127.0.0.1` bind unless you need remote clients, and only bind to `0.0.0.0` (or a LAN address) on a trusted network. Non-loopback binds require `KEV_MCP_ALLOWED_HOSTS`, a comma-separated list of exact `Host` header values accepted by FastMCP (for example, `192.168.5.80:8765`). Host and Origin validation remains enabled to protect against DNS rebinding; set the optional comma-separated `KEV_MCP_ALLOWED_ORIGINS` when browser clients need specific origins. Requests without an `Origin` header are allowed by FastMCP.
+
+### Sharing over a Cloudflare quick tunnel
+
+A [Cloudflare quick tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) gives the local HTTP server a public `https://<random>.trycloudflare.com` URL without opening any ports. Always set a token first, and keep the server bound to loopback:
+
+```bash
+mkdir -p ~/.config/kev-mcp
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))' > ~/.config/kev-mcp/token
+chmod 600 ~/.config/kev-mcp/token
+
+KEV_MCP_TRANSPORT=streamable-http \
+KEV_MCP_HOST=127.0.0.1 \
+KEV_MCP_PORT=8765 \
+KEV_MCP_AUTH_TOKEN_FILE=~/.config/kev-mcp/token \
+uv run kev-mcp-server
+
+# in another shell
+cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8765 --http-host-header 127.0.0.1:8765
+```
+
+cloudflared prints the public hostname; the MCP URL is `https://<name>.trycloudflare.com/mcp`. Clients must send `Authorization: Bearer <token>`.
+
+**Why `--http-host-header`:** cloudflared forwards the public `Host` header (`<name>.trycloudflare.com`) by default, and FastMCP's DNS-rebinding protection on a loopback bind only accepts `127.0.0.1:*`, `localhost:*` and `[::1]:*`, so requests would fail with `421 Invalid Host header`. Rewriting the Host header to `127.0.0.1:8765` keeps protection on without having to reconfigure the server each time a quick tunnel gets a new random hostname. (Alternatively, add the hostname to `KEV_MCP_ALLOWED_HOSTS`, which extends the loopback defaults, e.g. for a named tunnel with a stable hostname.) Browser-based clients that send an `Origin` header also need that origin in `KEV_MCP_ALLOWED_ORIGINS`.
+
+Quick tunnels are intended for testing: the hostname changes whenever cloudflared restarts and there is no uptime guarantee. The bearer token is the only access control, so treat it like a password and rotate it (rewrite the file and restart the server) if it leaks.
 
 ## Register with Hermes
 
