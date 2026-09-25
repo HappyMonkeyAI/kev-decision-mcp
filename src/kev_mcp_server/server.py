@@ -206,13 +206,19 @@ class BearerAuthMiddleware:
         self._expected = token.encode("utf-8")
 
     def _authorized(self, scope: Mapping[str, Any]) -> bool:
-        for name, value in scope.get("headers") or ():
-            if name.lower() == b"authorization":
-                scheme, _, credentials = value.partition(b" ")
-                if scheme.lower() == b"bearer":
-                    return hmac.compare_digest(credentials.strip(), self._expected)
-                return False
-        return False
+        values = [
+            value
+            for name, value in scope.get("headers") or ()
+            if name.lower() == b"authorization"
+        ]
+        # Reject duplicate credentials rather than letting an intermediary and
+        # this middleware disagree about which Authorization value is effective.
+        if len(values) != 1:
+            return False
+        scheme, separator, credentials = values[0].partition(b" ")
+        if not separator or scheme.lower() != b"bearer":
+            return False
+        return hmac.compare_digest(credentials.strip(), self._expected)
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         if scope["type"] != "http" or self._authorized(scope):

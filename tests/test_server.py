@@ -243,13 +243,13 @@ async def _ok_app(scope, receive, send):
     await send({"type": "http.response.body", "body": b"ok"})
 
 
-def _asgi_get(app, headers=None):
+def _asgi_get(app, headers=None, *, path="/mcp", method="POST"):
     import asyncio
 
     async def go():
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8765") as client:
-            return await client.post("/mcp", headers=headers or {}, content=b"{}")
+            return await client.request(method, path, headers=headers or {}, content=b"{}")
 
     return asyncio.run(go())
 
@@ -267,6 +267,19 @@ def test_bearer_middleware_rejects_missing_or_wrong_token(headers):
     assert resp.status_code == 401
     assert resp.json()["error"] == "unauthorized"
     assert resp.headers["www-authenticate"].startswith("Bearer")
+
+
+@pytest.mark.parametrize("path", ["/mcp", "/mcp/", "/MCP", "/health", "/openapi.json", "/other?x=1"])
+@pytest.mark.parametrize("method", ["GET", "POST", "OPTIONS"])
+def test_bearer_middleware_protects_all_http_paths_and_methods(path, method):
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), path=path, method=method)
+    assert resp.status_code == 401
+
+
+def test_bearer_middleware_rejects_duplicate_authorization_headers():
+    headers = [("Authorization", "Bearer tok"), ("authorization", "Bearer wrong")]
+    resp = _asgi_get(server.BearerAuthMiddleware(_ok_app, "tok"), headers)
+    assert resp.status_code == 401
 
 
 def test_no_token_passthrough():
