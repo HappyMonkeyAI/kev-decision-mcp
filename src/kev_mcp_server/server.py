@@ -221,6 +221,9 @@ class BearerAuthMiddleware:
         return hmac.compare_digest(credentials.strip(), self._expected)
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        # FastMCP's streamable-http app only ever issues "http" and "lifespan" scopes,
+        # so gating on "http" alone is sufficient today; a future websocket scope would
+        # need its own check here.
         if scope["type"] != "http" or self._authorized(scope):
             await self.app(scope, receive, send)
             return

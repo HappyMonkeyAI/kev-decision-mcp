@@ -130,6 +130,20 @@ def test_connection_and_http_errors_are_reported(monkeypatch):
         server.kev_list_models()
 
 
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: server.kev_evaluate("s", Q),
+        lambda: server.kev_permute("s", Q, "issue"),
+        lambda: server.kev_separate("s", Q),
+    ],
+)
+def test_non_object_response_is_rejected(monkeypatch, call):
+    mock_client(monkeypatch, lambda request: httpx.Response(200, json=["unexpected", "array"]))
+    with pytest.raises(RuntimeError, match="non-object response"):
+        call()
+
+
 def test_validation():
     with pytest.raises(ValueError, match="non-empty"):
         server.kev_evaluate("s", {})
