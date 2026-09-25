@@ -162,7 +162,23 @@ def test_main_configures_http_transport(monkeypatch):
     ran = []
     monkeypatch.setattr(server.mcp, "run", lambda transport: ran.append(transport))
     monkeypatch.setattr(server.mcp, "settings", server.mcp.settings.model_copy())
+    monkeypatch.setenv("KEV_MCP_ALLOWED_HOSTS", "192.168.5.80:9001, kev-box:9001")
+    monkeypatch.setenv("KEV_MCP_ALLOWED_ORIGINS", "http://localhost:3000")
     server.main(["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "9001"])
     assert ran == ["streamable-http"]
     assert (server.mcp.settings.host, server.mcp.settings.port) == ("0.0.0.0", 9001)
-    assert server.mcp.settings.transport_security is None
+    security = server.mcp.settings.transport_security
+    assert security is not None
+    assert security.enable_dns_rebinding_protection is True
+    assert security.allowed_hosts == ["192.168.5.80:9001", "kev-box:9001"]
+    assert security.allowed_origins == ["http://localhost:3000"]
+
+
+def test_non_loopback_http_requires_allowed_hosts(monkeypatch):
+    ran = []
+    monkeypatch.setattr(server.mcp, "run", lambda transport: ran.append(transport))
+    monkeypatch.setattr(server.mcp, "settings", server.mcp.settings.model_copy())
+    monkeypatch.delenv("KEV_MCP_ALLOWED_HOSTS", raising=False)
+    with pytest.raises(SystemExit, match="require KEV_MCP_ALLOWED_HOSTS"):
+        server.main(["--transport", "streamable-http", "--host", "0.0.0.0"])
+    assert ran == []

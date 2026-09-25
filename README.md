@@ -91,10 +91,14 @@ To serve MCP over the network instead of stdio:
 
 ```bash
 uv run kev-mcp-server --transport streamable-http            # http://127.0.0.1:8765/mcp
-KEV_MCP_TRANSPORT=streamable-http KEV_MCP_HOST=0.0.0.0 KEV_MCP_PORT=8765 uv run kev-mcp-server
+KEV_MCP_TRANSPORT=streamable-http \
+KEV_MCP_HOST=0.0.0.0 \
+KEV_MCP_PORT=8765 \
+KEV_MCP_ALLOWED_HOSTS=192.168.5.80:8765 \
+uv run kev-mcp-server
 ```
 
-The MCP endpoint is `/mcp`. **There is no authentication**: keep the default `127.0.0.1` bind unless you need remote clients, and only bind to `0.0.0.0` (or a LAN address) on a trusted network. When bound to a non-loopback host, FastMCP's localhost-only Host/Origin checks are disabled so LAN clients can connect.
+The MCP endpoint is `/mcp`. **There is no authentication**: keep the default `127.0.0.1` bind unless you need remote clients, and only bind to `0.0.0.0` (or a LAN address) on a trusted network. Non-loopback binds require `KEV_MCP_ALLOWED_HOSTS`, a comma-separated list of exact `Host` header values accepted by FastMCP (for example, `192.168.5.80:8765`). Host and Origin validation remains enabled to protect against DNS rebinding; set the optional comma-separated `KEV_MCP_ALLOWED_ORIGINS` when browser clients need specific origins. Requests without an `Origin` header are allowed by FastMCP.
 
 ## Register with Hermes
 

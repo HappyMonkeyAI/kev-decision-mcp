@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8008"
 REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=5.0)
@@ -162,6 +163,11 @@ def _transport_config(
     return args.transport, args.host, args.port
 
 
+def _csv_env(name: str) -> list[str]:
+    """Read a comma-separated environment variable as a trimmed list."""
+    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Run over stdio (default) or streamable HTTP when requested via --transport/KEV_MCP_TRANSPORT."""
     transport, host, port = _transport_config(argv)
@@ -169,9 +175,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         mcp.settings.host = host
         mcp.settings.port = port
         if host not in LOOPBACK_HOSTS:
-            # FastMCP enables localhost-only Host/Origin checks at construction time; drop them for LAN binds,
-            # matching what FastMCP does when constructed with a non-loopback host.
-            mcp.settings.transport_security = None
+            allowed_hosts = _csv_env("KEV_MCP_ALLOWED_HOSTS")
+            if not allowed_hosts:
+                raise SystemExit(
+                    "non-loopback HTTP binds require KEV_MCP_ALLOWED_HOSTS "
+                    "(comma-separated Host header values)"
+                )
+            mcp.settings.transport_security = TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=allowed_hosts,
+                allowed_origins=_csv_env("KEV_MCP_ALLOWED_ORIGINS"),
+            )
     mcp.run(transport=transport)
 
 

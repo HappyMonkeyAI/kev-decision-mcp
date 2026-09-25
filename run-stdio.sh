@@ -1,2 +1,3 @@
 #!/bin/sh
-exec uv run --directory /home/stephen/projects/jev_mcp kev-mcp-server
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+exec uv run --directory "$SCRIPT_DIR" kev-mcp-server
