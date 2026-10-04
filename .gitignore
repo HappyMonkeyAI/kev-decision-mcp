@@ -2,3 +2,11 @@
 __pycache__/
 .pytest_cache/
 *.py[cod]
+benchmarks/private/
+.env
+.env.*
+!.env.example
+.cache/
+# Local exploratory audit artifacts; source data and metadata remain private.
+/project23-*
+/integrations/hermes-shadow/TRIAL-STATUS.md

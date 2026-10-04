@@ -1,6 +1,6 @@
 # Kev MCP Server
 
-A small FastMCP adapter (stdio by default, optional streamable HTTP) exposing the Kev jev model (https://github.com/jaredpalmer/kev) pointer-head decision API (default `http://127.0.0.1:8008`, configurable via `KEV_API_BASE_URL`) as four agent tools. The model identifier is intentionally fixed to `kev-latest` from https://github.com/jaredpalmer/kev for decision calls; this is not a text-generation interface.
+A small FastMCP adapter (stdio by default, optional streamable HTTP) exposing the Kev jev model (https://github.com/jaredpalmer/kev) pointer-head decision API (default `http://127.0.0.1:8008`, configurable via `KEV_API_BASE_URL`) as five agent tools. The model identifier is intentionally fixed to `kev-latest` from https://github.com/jaredpalmer/kev for decision calls; this is not a text-generation interface.
 
 ## Tools
 
@@ -10,6 +10,54 @@ A small FastMCP adapter (stdio by default, optional streamable HTTP) exposing th
 - `kev_permute(state, questions, question, n_perm=6, seed=0)`: POST `/v1/systemone/permute`. The API requires its documented wrapper `{request, question, n_perm, seed}`. Supply exactly one Choice question and its key as `question`; `n_perm` is 1–64.
 - `kev_separate(state, questions)`: POST `/v1/systemone/separate`.
 - `kev_list_models()`: GET `/v1/models`.
+- `kev_select_tool(state, tools)`: suggest a tool in shadow mode, returning probabilities without executing anything or generating arguments.
+
+### Shadow tool selection
+
+Supply the user request, relevant prior context, and only the tools actually available
+to the calling agent. Each tool needs a description; an optional `parameters` object
+can contain its argument schema. The reserved option `__no_tool__` is added automatically.
+
+```json
+{
+  "state": {
+    "user_request": "Find where this project reads its API key",
+    "context": "The current repository is available locally"
+  },
+  "tools": {
+    "search_files": {"description": "Search text in local project files"},
+    "web_search": {"description": "Search the web for external information"}
+  }
+}
+```
+
+The result contains `mode: "shadow"`, `suggested_tool` (a supplied tool name or
+`null`), `executed: false`, `probabilities`, `top_probability`, and upstream model,
+latency and usage metadata. No probability threshold or automatic fallback is applied.
+The calling agent keeps its own decision and validates permissions and arguments.
+A suggestion is not evidence that an action is authorised or that all arguments
+are present. Upstream errors remain tool errors; the caller should continue its
+normal decision process when Kev is unavailable.
+
+For a trial, compare the suggestion with the agent's independently selected next
+tool before changing its behaviour. Record agreement, whether the agent's choice
+was correct after review, added latency, and the full model revision from
+`kev_list_models()`. The adapter does not save requests or decisions to disk.
+Tool names must be non-empty and cannot be `__no_tool__`; supply 1–254 tools.
+The helper's paired ToolSelect pilot scored 518/552 (93.84%), versus 534/552
+(96.74%) for the original prompt. It abstained on 21 tool-labelled cases. That
+corpus does not test correct abstention, and the public training data does not
+establish production reliability. Keep suggestions advisory.
+
+To repeat the paired comparison against a running Kev server:
+
+```bash
+uv run python scripts/evaluate-shadow.py /path/to/toolselect.jsonl \
+  --url http://127.0.0.1:8008 --output /path/to/benchmark-results-shadow-paired.json
+```
+
+The runner alternates baseline/helper order, records source/data fingerprints,
+and reports failures explicitly. Set `KEV_API_KEY` if required by the API.
 
 ## Question types
 
@@ -56,6 +104,7 @@ Transport timeouts, connection errors, HTTP errors, invalid JSON, and unexpected
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `KEV_API_BASE_URL` | `http://127.0.0.1:8008` | Kev API origin. **Set this when Kev runs on another machine**, e.g. `KEV_API_BASE_URL=http://192.168.5.157:8008`. |
+| `KEV_API_KEY` | unset | Bearer key sent to the upstream Kev API. Match the key configured in Kev; separate from `KEV_MCP_AUTH_TOKEN`, which protects incoming MCP requests. |
 | `KEV_MCP_TRANSPORT` | `stdio` | MCP transport: `stdio` or `streamable-http` (same as `--transport`). |
 | `KEV_MCP_HOST` | `127.0.0.1` | Bind host for `streamable-http` (same as `--host`). |
 | `KEV_MCP_PORT` | `8765` | Bind port for `streamable-http` (same as `--port`). |
@@ -162,6 +211,18 @@ Other MCP hosts can launch the same stdio command directly. For Claude Desktop, 
 ```
 
 ## Verification
+
+### Experimental crypto second opinion
+
+An optional CPU Gutsy comparison backend runs separately on MCP port 8766;
+the existing Kev endpoint remains on 8765. See [deployment and rejection semantics](docs/GUTSY-COMPARISON.md)
+and [the paired Project23 results](benchmarks/GUTSY-RESULTS.md).
+
+`kev_review_trade` reviews caller-supplied timestamped market context, a proposed
+trade and explicit risk constraints in paper-advisory mode. It can return
+supports_proposal, concerns or insufficient_information; it never places orders
+or grants execution permission. See [the contract and label-review procedure](docs/TRADE-ADVISORY.md).
+The previous two-choice Project23 benchmark does not validate this new prompt.
 
 ```bash
 uv run pytest

@@ -1,0 +1,4 @@
+name: kev-shadow-trial
+version: 0.1.0
+description: Opt-in comparison of Kev suggestions with Hermes tool choices
+kind: standalone

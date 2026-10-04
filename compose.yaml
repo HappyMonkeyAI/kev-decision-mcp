@@ -1,0 +1,21 @@
+name: kev-advisory
+services:
+  mcp:
+    build: .
+    image: kev-decision-mcp:local
+    ports:
+      - "${KEV_MCP_BIND_HOST:-127.0.0.1}:8765:8765"
+    environment:
+      KEV_API_BASE_URL: "${KEV_API_BASE_URL:-http://host.docker.internal:8008}"
+      KEV_API_KEY: "${KEV_API_KEY:?Set KEV_API_KEY in .env}"
+      KEV_MCP_AUTH_TOKEN: "${KEV_MCP_AUTH_TOKEN:-}"
+      KEV_MCP_ALLOWED_HOSTS: "${KEV_MCP_ALLOWED_HOSTS:-localhost:8765,127.0.0.1:8765}"
+      KEV_MCP_ALLOWED_ORIGINS: "${KEV_MCP_ALLOWED_ORIGINS:-}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true

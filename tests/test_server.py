@@ -15,6 +15,7 @@ def fresh_client(monkeypatch):
     """Drop the shared client so each test builds one from its patched httpx.Client."""
     monkeypatch.setattr(server, "_client", None)
     monkeypatch.delenv("KEV_API_BASE_URL", raising=False)
+    monkeypatch.delenv("KEV_API_KEY", raising=False)
 
 
 def mock_client(monkeypatch, handler):
@@ -75,6 +76,22 @@ def test_http_client_is_reused(monkeypatch):
     server.kev_list_models()
     assert len(created) == 1
     assert created[0]["timeout"] == server.REQUEST_TIMEOUT
+
+
+def test_upstream_auth_is_optional_and_read_per_request(monkeypatch):
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers.get("authorization"))
+        return httpx.Response(200, json={"models": []})
+
+    mock_client(monkeypatch, handler)
+    server.kev_list_models()
+    monkeypatch.setenv("KEV_API_KEY", "upstream-secret")
+    server.kev_evaluate("s", Q)
+    monkeypatch.setenv("KEV_API_KEY", "rotated-secret")
+    server.kev_list_models()
+    assert seen == [None, "Bearer upstream-secret", "Bearer rotated-secret"]
 
 
 def test_permute_uses_api_envelope(monkeypatch):
