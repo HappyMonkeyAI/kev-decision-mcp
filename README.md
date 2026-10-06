@@ -1,6 +1,6 @@
 # Kev MCP Server
 
-A small FastMCP adapter (stdio by default, optional streamable HTTP) exposing the Kev jev model (https://github.com/jaredpalmer/kev) pointer-head decision API (default `http://127.0.0.1:8008`, configurable via `KEV_API_BASE_URL`) as five agent tools. The model identifier is intentionally fixed to `kev-latest` from https://github.com/jaredpalmer/kev for decision calls; this is not a text-generation interface.
+A small FastMCP adapter (stdio by default, optional streamable HTTP) exposing the Kev jev model (https://github.com/jaredpalmer/kev) pointer-head decision API (default `http://127.0.0.1:8008`, configurable via `KEV_API_BASE_URL`) as agent tools. The model identifier is intentionally fixed to `kev-latest` from https://github.com/jaredpalmer/kev for decision calls; this is not a text-generation interface.
 
 ## Tools
 
@@ -11,6 +11,7 @@ A small FastMCP adapter (stdio by default, optional streamable HTTP) exposing th
 - `kev_separate(state, questions)`: POST `/v1/systemone/separate`.
 - `kev_list_models()`: GET `/v1/models`.
 - `kev_select_tool(state, tools)`: suggest a tool in shadow mode, returning probabilities without executing anything or generating arguments.
+- `kev_custom_decision(task, state, options)`: evaluate one bounded, agent-defined choice schema with a reserved insufficient-information option. The schema applies to that call only.
 
 ### Shadow tool selection
 
@@ -58,6 +59,18 @@ uv run python scripts/evaluate-shadow.py /path/to/toolselect.jsonl \
 
 The runner alternates baseline/helper order, records source/data fingerprints,
 and reports failures explicitly. Set `KEV_API_KEY` if required by the API.
+
+### Custom decision schema
+
+Use `kev_custom_decision` when no focused tool fits. Supply a short task statement,
+the case state, and 2–8 option IDs with concise meanings. The server adds the
+reserved `__insufficient_information__` option, bounds the combined JSON input to
+64 KiB, validates the returned option and full probability distribution, and
+returns no free-form rationale or action. An abstention or a dominant upstream
+rejection yields `selected_option: null`; inspect `abstained` and the probability
+metadata. Results are advisory and uncalibrated. The per-call schema does not
+change MCP tool registration or override the focused billing/trading tools.
+See [docs/CUSTOM-DECISIONS.md](docs/CUSTOM-DECISIONS.md) for an example and limits.
 
 ## Question types
 
