@@ -1,0 +1,20 @@
+{
+  "repository": "kouhxp/gutsy",
+  "revision": "bb1dde4c571b2588801c27d155da005a87d05285",
+  "sha256": {
+    "models/gutsy-0.8b-v04-q8_0.gguf": "d71d7a3da4bb05fd7e26802c294fa08c937fb57c0d0fc75ea91ccc7231e708ee",
+    "models/gutsy-0.8b-v04.calibration.json": "c48b05118fb1ebf8c651bd39ee76a5323f18514cde3dea2ae2ab2db7e68a7a62",
+    "runtime/pyproject.toml": "98fde4eef6f9bae33df3bb8d272830d0a1ff54c568838f76dea8f5b430713c63",
+    "runtime/README.md": "c9bd20df36732ae54c992feebbedeeb1aab6e6c7266c4d086c962eb9c0da09f7",
+    "runtime/gutsy_inference/backend_llamacpp.py": "005f90e78d8b2200986323e95b48f7d8dfbf35a0b8b76313b786ed83f8b6d702",
+    "runtime/gutsy_inference/bench.py": "c7293f066b75979ca74f82493fa0f2f92e368e08878a6a67d6edf2dc6a0b1bbb",
+    "runtime/gutsy_inference/cli.py": "b196b80b450526b51dec6e65dd254ff7c687af019f21397ae767eece789c4cb5",
+    "runtime/gutsy_inference/engine.py": "189b3979cd78a058aa3cb67f7c93679f347ec579b7051d350fd6309f1663f28e",
+    "runtime/gutsy_inference/prompt.py": "1d53cc7043a238be656e56cf705fbf641f383858fe390c7d9e9059cf3276bcaf",
+    "runtime/gutsy_inference/registry.py": "ab9fbc5f7301dcd7d0324cca43ef77e7a18ca0a5189d4513406f10da3b5c1292",
+    "runtime/gutsy_inference/schema.py": "8a55f1bf250c8c821b7ebf570a9b0f2092097097bcb121d1655b5abdb3069354",
+    "runtime/gutsy_inference/server.py": "0ba231b48e8d13ec4ca1aae4b23b87a73458fdb73f0e2c6c4721ec2cf796f05b",
+    "runtime/gutsy_inference/shortlist.py": "9de4056b073e1eded8c383f351bf6f79392ff1a3c23fc2f5d265a45c7cac1e18",
+    "runtime/gutsy_inference/__init__.py": "05ba80dd7cc415230e6458effc795b3ed0eba1155d2ae9f168f1a08935b1fd7f"
+  }
+}

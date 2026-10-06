@@ -15,6 +15,13 @@ def test_missing_reject_on_gutsy_is_an_error(monkeypatch):
         server._rejection_metadata({'choice':'x','probabilities':{'x':1}})
 
 
+def test_rejection_metadata_rejects_empty_or_invalid_probabilities():
+    with pytest.raises(RuntimeError, match='option probabilities'):
+        server._rejection_metadata({'choice':'x','probabilities':{},'reject':.5})
+    with pytest.raises(RuntimeError, match='option probabilities'):
+        server._rejection_metadata({'choice':'x','probabilities':{'x':0.5},'reject':.5})
+
+
 @pytest.mark.parametrize('reject',[True,-.1,1.1,float('nan')])
 def test_invalid_reject(reject):
     with pytest.raises(RuntimeError):

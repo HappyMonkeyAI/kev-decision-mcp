@@ -156,6 +156,14 @@ def kev_list_models() -> dict[str, Any]:
 
 
 def _rejection_metadata(answer: dict[str, Any]) -> dict[str, Any]:
+    probabilities = answer.get("probabilities")
+    choice = answer.get("choice")
+    if (not isinstance(choice, str) or not isinstance(probabilities, dict)
+            or not probabilities or choice not in probabilities
+            or not all(type(p) in (int, float) and math.isfinite(p) and 0 <= p <= 1
+                       for p in probabilities.values())
+            or abs(sum(probabilities.values()) - 1) > 0.02):
+        raise RuntimeError("Invalid option probabilities for rejection metadata")
     reject = answer.get("reject")
     if reject is None:
         if os.environ.get("KEV_BACKEND") == "gutsy":
@@ -163,11 +171,11 @@ def _rejection_metadata(answer: dict[str, Any]) -> dict[str, Any]:
         return {}
     if type(reject) not in (int, float) or not math.isfinite(reject) or not 0 <= reject <= 1:
         raise RuntimeError("Invalid rejection probability")
-    joint = {k: (1-reject)*p for k, p in answer["probabilities"].items()}
+    joint = {k: (1-reject)*p for k, p in probabilities.items()}
     return {"rejection_probability": reject, "probability_semantics": "conditional_on_not_reject",
             "unconditional_option_probabilities": joint,
             "rejection_dominates": reject > max(joint.values()),
-            "conditional_model_choice": answer["choice"]}
+            "conditional_model_choice": choice}
 
 
 @mcp.tool()
