@@ -23,7 +23,9 @@ async def main():
             async with ClientSession(read,write) as session:
                 await session.initialize()
                 tools=await session.list_tools()
-                assert 'kev_review_trade' in {t.name for t in tools.tools}
+                tool_names={t.name for t in tools.tools}
+                assert 'kev_review_trade' in tool_names
+                assert 'kev_custom_decision' in tool_names
                 models=await session.call_tool('kev_list_models',{})
                 assert not models.isError
                 now=datetime.now(timezone.utc)
@@ -40,9 +42,26 @@ async def main():
                 market['observed_at']=now.isoformat()
                 live=await session.call_tool('kev_review_trade',arguments())
                 assert not live.isError
+                custom=await session.call_tool('kev_custom_decision',{
+                    'task':'Classify this synthetic paper-only fixture using the supplied options',
+                    'state':{'fixture':'synthetic','market_facts':'intentionally incomplete','execution':False},
+                    'options':{'continue_review':'Keep reviewing with human oversight',
+                               'defer':'Wait for more information before deciding'}})
+                assert not custom.isError
+                custom_result=custom.structuredContent
+                assert isinstance(custom_result,dict)
+                assert custom_result.get('mode')=='custom_advisory'
+                assert custom_result.get('executed') is False
+                assert custom_result.get('execution_authorized') is False
+                assert isinstance(custom_result.get('abstained'),bool)
+                assert set(custom_result.get('probabilities',{}))=={
+                    'continue_review','defer','__insufficient_information__'}
+                assert custom_result.get('selected_option') in {
+                    None,'continue_review','defer'}
                 print(json.dumps({'mcp_authentication_enabled':bool(token),'unauthenticated_status':unauthenticated_status,'trade_tool_discovered':True,
                                   'model_listing':models.structuredContent,'missing_context_check':'passed',
-                                  'stale_context_check':'passed','synthetic_live_review':live.structuredContent}),flush=True)
+                                  'stale_context_check':'passed','synthetic_live_review':live.structuredContent,
+                                  'custom_decision_smoke':custom_result}),flush=True)
 
 
 asyncio.run(main())
