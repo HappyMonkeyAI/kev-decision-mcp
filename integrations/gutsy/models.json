@@ -1,0 +1,15 @@
+{
+  "default": "gutsy-0.8b-v04",
+  "n_threads": 4,
+  "n_gpu_layers": 0,
+  "cache_entries": 4,
+  "cache_mb": 256,
+  "models": {
+    "gutsy-0.8b-v04": {
+      "gguf": "/models/gutsy-0.8b-v04-q8_0.gguf",
+      "calibration": "/models/gutsy-0.8b-v04.calibration.json",
+      "n_ctx": 8192,
+      "reject_slot": true
+    }
+  }
+}

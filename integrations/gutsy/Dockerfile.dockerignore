@@ -1,0 +1,9 @@
+*
+!.cache/
+!.cache/gutsy/
+!.cache/gutsy/runtime/
+!.cache/gutsy/runtime/**
+!integrations/
+!integrations/gutsy/
+!integrations/gutsy/models.json
+!integrations/gutsy/Dockerfile
