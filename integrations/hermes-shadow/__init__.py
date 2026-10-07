@@ -28,7 +28,7 @@ def register(ctx):
     jobs = queue.Queue(maxsize=32)
     diagnostics = {"pid": owner, "pre_requests": 0, "post_tools": 0,
                    "snapshots": 0, "queued": 0, "completed": 0, "last_skip": None}
-    endpoint = os.environ.get("KEV_SHADOW_URL", "http://192.168.5.232:8008").rstrip("/")
+    endpoint = os.environ.get("KEV_SHADOW_URL", "http://127.0.0.1:8008").rstrip("/")
 
     def worker():
         retained_lock = lock  # Keep ownership after Hermes discards register(ctx).

@@ -59,9 +59,9 @@ def test_default_base_url_and_override(monkeypatch):
     mock_client(monkeypatch, handler)
     assert server.DEFAULT_BASE_URL == "http://127.0.0.1:8008"
     server.kev_list_models()
-    monkeypatch.setenv("KEV_API_BASE_URL", "http://192.168.5.157:8008/")
+    monkeypatch.setenv("KEV_API_BASE_URL", "http://kev-host.example:8008/")
     server.kev_list_models()
-    assert urls == ["http://127.0.0.1:8008/v1/models", "http://192.168.5.157:8008/v1/models"]
+    assert urls == ["http://127.0.0.1:8008/v1/models", "http://kev-host.example:8008/v1/models"]
 
 
 def test_http_client_is_reused(monkeypatch):
@@ -204,7 +204,7 @@ def http_env(monkeypatch):
 
 
 def test_main_configures_http_transport(monkeypatch, http_env):
-    monkeypatch.setenv("KEV_MCP_ALLOWED_HOSTS", "192.168.5.80:9001, kev-box:9001")
+    monkeypatch.setenv("KEV_MCP_ALLOWED_HOSTS", "192.0.2.80:9001, kev-box:9001")
     monkeypatch.setenv("KEV_MCP_ALLOWED_ORIGINS", "http://localhost:3000")
     server.main(["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "9001"])
     assert len(http_env) == 1
@@ -215,7 +215,7 @@ def test_main_configures_http_transport(monkeypatch, http_env):
     security = server.mcp.settings.transport_security
     assert security is not None
     assert security.enable_dns_rebinding_protection is True
-    assert security.allowed_hosts == ["192.168.5.80:9001", "kev-box:9001"]
+    assert security.allowed_hosts == ["192.0.2.80:9001", "kev-box:9001"]
     assert security.allowed_origins == ["http://localhost:3000"]
 
 

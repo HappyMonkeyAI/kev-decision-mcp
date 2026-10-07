@@ -116,7 +116,7 @@ Transport timeouts, connection errors, HTTP errors, invalid JSON, and unexpected
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `KEV_API_BASE_URL` | `http://127.0.0.1:8008` | Kev API origin. **Set this when Kev runs on another machine**, e.g. `KEV_API_BASE_URL=http://192.168.5.157:8008`. |
+| `KEV_API_BASE_URL` | `http://127.0.0.1:8008` | Kev API origin. Set this to the model API address when Kev runs on another machine. |
 | `KEV_API_KEY` | unset | Bearer key sent to the upstream Kev API. Match the key configured in Kev; separate from `KEV_MCP_AUTH_TOKEN`, which protects incoming MCP requests. |
 | `KEV_MCP_TRANSPORT` | `stdio` | MCP transport: `stdio` or `streamable-http` (same as `--transport`). |
 | `KEV_MCP_HOST` | `127.0.0.1` | Bind host for `streamable-http` (same as `--host`). |
@@ -148,7 +148,7 @@ uv run python -m kev_mcp_server.server
 If Kev is not on the same machine, point the adapter at it:
 
 ```bash
-KEV_API_BASE_URL=http://192.168.5.157:8008 uv run kev-mcp-server
+KEV_API_BASE_URL=http://kev-host.example:8008 uv run kev-mcp-server
 ```
 
 ### Streamable HTTP (optional)
@@ -160,11 +160,11 @@ uv run kev-mcp-server --transport streamable-http            # http://127.0.0.1:
 KEV_MCP_TRANSPORT=streamable-http \
 KEV_MCP_HOST=0.0.0.0 \
 KEV_MCP_PORT=8765 \
-KEV_MCP_ALLOWED_HOSTS=192.168.5.80:8765 \
+KEV_MCP_ALLOWED_HOSTS=kev-host.example:8765 \
 uv run kev-mcp-server
 ```
 
-The MCP endpoint is `/mcp`. Authentication is **off unless `KEV_MCP_AUTH_TOKEN` or `KEV_MCP_AUTH_TOKEN_FILE` is set** (the server logs a warning when HTTP runs without a token). With a token, every request must carry `Authorization: Bearer <token>` (compared in constant time); anything else gets `401` with a JSON body. Keep the default `127.0.0.1` bind unless you need remote clients, and only bind to `0.0.0.0` (or a LAN address) on a trusted network. Non-loopback binds require `KEV_MCP_ALLOWED_HOSTS`, a comma-separated list of exact `Host` header values accepted by FastMCP (for example, `192.168.5.80:8765`). Host and Origin validation remains enabled to protect against DNS rebinding; set the optional comma-separated `KEV_MCP_ALLOWED_ORIGINS` when browser clients need specific origins. Requests without an `Origin` header are allowed by FastMCP.
+The MCP endpoint is `/mcp`. Authentication is **off unless `KEV_MCP_AUTH_TOKEN` or `KEV_MCP_AUTH_TOKEN_FILE` is set** (the server logs a warning when HTTP runs without a token). With a token, every request must carry `Authorization: Bearer <token>` (compared in constant time); anything else gets `401` with a JSON body. Keep the default `127.0.0.1` bind unless you need remote clients, and only bind to `0.0.0.0` (or a LAN address) on a trusted network. Non-loopback binds require `KEV_MCP_ALLOWED_HOSTS`, a comma-separated list of exact `Host` header values accepted by FastMCP (for example, `kev-host.example:8765`). Replace the example hostname with the address clients use. Host and Origin validation remains enabled to protect against DNS rebinding; set the optional comma-separated `KEV_MCP_ALLOWED_ORIGINS` when browser clients need specific origins. Requests without an `Origin` header are allowed by FastMCP.
 
 ### Sharing over a Cloudflare quick tunnel
 
@@ -203,7 +203,7 @@ mcp_servers:
     connect_timeout: 30
 ```
 
-The executable wrapper pins the stdio launch command and avoids argument-list serialization differences between Hermes versions. The server has already been registered in this Hermes profile using:
+The executable wrapper pins the stdio launch command and avoids argument-list serialization differences between Hermes versions. Register the server in a Hermes profile with:
 
 ```bash
 hermes config set mcp_servers.kev.command /home/user/kev-decision-mcp/run-stdio.sh

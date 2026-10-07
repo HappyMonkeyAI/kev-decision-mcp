@@ -6,7 +6,7 @@ environment needs the adapter dependencies. Enable its registration with
 `hermes plugins enable --no-allow-tool-override kev-shadow-trial`. No hooks register unless
 `KEV_SHADOW_TRIAL=1`. No running agent needs restarting.
 
-Launch one new process with `KEV_SHADOW_TRIAL=1 KEV_SHADOW_URL=http://192.168.5.232:8008 hermes`.
+Launch one new process with `KEV_SHADOW_TRIAL=1 KEV_SHADOW_URL=http://127.0.0.1:8008 hermes`. Set `KEV_SHADOW_URL` to the Kev API address when it runs on another machine.
 Optional `KEV_SHADOW_API_KEY` authenticates the comparison requests only.
 The default remote endpoint serves Kev **0.8B**, unlike the earlier 4B benchmark.
 Each record includes endpoint model metadata; do not combine these results.

@@ -1,66 +1,68 @@
-# Local advisory server on 192.168.5.157
+# Local Docker Compose deployment
 
-Docker Desktop runs two services under the kev-advisory project:
-Kev 4B (the cached pinned checkpoint) and the MCP adapter.
-The model API publishes localhost:8008; clients use the MCP endpoint
-http://192.168.5.157:8765/mcp. The adapter calls the model on the private Docker
-network. The previous Kev 0.8B benchmark on .232 is a separate deployment.
+This repository can run the MCP adapter beside an existing Kev model API, or
+combine the adapter with the optional model and Gutsy Compose files. The adapter
+connects to the model over the Docker network when both are in Compose, or to an
+address configured with `KEV_API_BASE_URL` when the model runs elsewhere.
 
-Installation checked on 2026-10-04: both containers running, model healthy on
-CUDA, LAN-address authentication rejection (401), authenticated MCP discovery,
-missing/stale-context checks and a synthetic live review passed. Kev returned
-insufficient_information for the synthetic fixture (0.6518, 190 ms warm model
-latency). The full unit suite passed: 86 tests. Client access from another LAN
-computer and the intended ChatGPT session are not yet verified. The first
-verification client's shutdown hung; a fresh full HTTP MCP smoke test completed
-successfully and only the old verification client was stopped.
+## Start and stop
 
-## Start, stop and copy
+Create a private `.env` from `.env.example` and configure the upstream model
+credentials. `KEV_MCP_AUTH_TOKEN` is optional for trusted local use; set a strong
+token whenever clients connect over a network you do not fully control. Never
+commit `.env` or paste configured secrets into shared logs.
 
-Create .env from .env.example and set KEV_API_KEY to a random secret for the
-model. KEV_MCP_AUTH_TOKEN is optional: blank disables MCP authentication.
-On 2026-10-04, at the user's request, the local MCP token was cleared for LAN
-use; the model API key remains enabled. A nonempty MCP token enables bearer
-authentication. Never paste configured secrets into chat or commit them.
+Start the adapter-only deployment with:
 
-Run from this folder:
-
-```powershell
-docker compose -f compose.yaml -f compose.model.yaml up -d --build
-docker compose -f compose.yaml -f compose.model.yaml ps
-docker compose -f compose.yaml -f compose.model.yaml stop
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose stop
 ```
 
-The combined setup uses the existing kev-server:local image and external cache
-volume docker_kev-hf-cache. Copying this folder alone does not copy that image or
-cache to a different computer. Build the model image from kev-docker first and
-configure an existing cache volume, or deliberately enable downloads with
-HF_HUB_OFFLINE=0. Keep offline mode when using this machine's cached checkpoint.
-Copying the adapter folder to another directory on the same computer reuses
-the Docker image/cache, but needs its own private .env. The fixed project name
-targets the same Compose services; stop the previous instance before relocating.
-Do not include benchmarks/private, .venv or credentials in a shared copy.
+For a model deployment defined by this repository, follow the model-specific
+instructions and combine its Compose file with `compose.yaml`. For the optional
+Gutsy CPU backend, see [Gutsy comparison deployment](GUTSY-COMPARISON.md).
 
-The adapter-only command `docker compose up -d --build` can instead use
-KEV_API_BASE_URL to point at an existing model API. Both modes require explicit
-model authentication; MCP authentication is optional. Docker build context includes source/lockfiles only,
-not .env or private datasets. The adapter uses a nonroot user and read-only root.
+The adapter-only deployment expects an existing model API. If that API runs on
+the host, set `KEV_API_BASE_URL` to a host address reachable from the container
+(on Docker Desktop, `host.docker.internal` is commonly available). If it runs in
+another container, use the Compose service name and internal port. The API key
+must be configured privately and match the model service.
+
+## Network access
+
+The default MCP bind is loopback. To allow remote clients, set
+`KEV_MCP_BIND_HOST=0.0.0.0` and explicitly set
+`KEV_MCP_ALLOWED_HOSTS` to the exact `host:port` values clients use. Add a
+bearer token for network clients and restrict access with the host firewall.
+Do not use a wildcard to bypass Host validation. The container's MCP endpoint is
+`/mcp`.
+
+For example, with a private DNS entry `kev-host.example`:
+
+```dotenv
+KEV_MCP_BIND_HOST=0.0.0.0
+KEV_MCP_ALLOWED_HOSTS=kev-host.example:8765
+KEV_MCP_AUTH_TOKEN=replace-with-a-private-random-token
+```
+
+Copying this folder to another computer does not copy Docker images, model
+caches, or private configuration. Build or pull the required image and provide
+that host's own `.env`. Avoid sharing benchmark outputs if they contain private
+data.
 
 ## Client configuration
 
-For a client with LAN-capable streamable HTTP MCP support, configure the URL
-above without an Authorization header when the MCP token is blank. If a token
-is configured, supply Authorization: Bearer <KEV_MCP_AUTH_TOKEN> through secure
-credential settings. Verify discovery before instructing it to call kev_review_trade.
-An instruction in chat alone does not create an MCP connection. Availability
-of LAN MCP connections in the intended ChatGPT desktop session has not been
-verified; a remote connector may need an HTTPS endpoint accessible to it.
-No public tunnel or firewall changes are made by this setup.
+Configure an MCP client to use the reachable `http://<host>:8765/mcp` endpoint.
+If a token is set, supply it through the client's secure credential settings as
+`Authorization: Bearer <token>`. Confirm MCP discovery before asking the client
+to review decisions. A prompt alone does not create a connection.
 
-For a local stdio-capable host on this same computer, a copied source checkout
-can launch `uv run kev-mcp-server` with KEV_API_BASE_URL=http://127.0.0.1:8008
-and the matching KEV_API_KEY in its launch environment. That starts its own
-adapter process rather than connecting to the Docker MCP HTTP endpoint.
+For local stdio clients, install the project and launch `uv run kev-mcp-server`
+with the model URL and key available in the process environment. This starts a
+local adapter process rather than connecting to the Docker MCP endpoint.
 
-Read TRADE-ADVISORY.md before paper tests. Responses are second opinions,
-probabilities are uncalibrated, and no exchange connection or orders exist.
+Read [trade advisory limitations](../TRADE-ADVISORY.md) before paper testing.
+Responses are second opinions; probabilities are uncalibrated, and the project
+does not connect to exchanges or place orders.

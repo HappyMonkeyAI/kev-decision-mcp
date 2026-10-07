@@ -25,7 +25,7 @@ here. The test confusion counts were:
 
 Mean test Brier sums over the two conditional options were 0.372 for Kev and
 0.471 for Gutsy. These conditional scores do not measure correct rejection.
-Probabilities remain uncalibrated on the user's advisory/trading workflow.
+Probabilities remain uncalibrated for the target advisory/trading workflow.
 
 ## Abstention smoke checks
 

@@ -30,7 +30,7 @@ services:
       KEV_BACKEND: gutsy
       KEV_API_MODEL: gutsy-0.8b-v04
       KEV_MCP_AUTH_TOKEN: "${KEV_MCP_AUTH_TOKEN:-}"
-      KEV_MCP_ALLOWED_HOSTS: "${GUTSY_MCP_ALLOWED_HOSTS:-192.168.5.157:8766,localhost:8766,127.0.0.1:8766,localhost:8765,127.0.0.1:8765}"
+      KEV_MCP_ALLOWED_HOSTS: "${GUTSY_MCP_ALLOWED_HOSTS:-localhost:8766,127.0.0.1:8766,localhost:8765,127.0.0.1:8765}"
     depends_on:
       gutsy:
         condition: service_healthy
