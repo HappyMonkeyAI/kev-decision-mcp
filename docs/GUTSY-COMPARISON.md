@@ -1,10 +1,9 @@
 # Gutsy comparison deployment
 
-Gutsy is a separate CPU backend, not a replacement for the running Kev 4B
-service. Its model API is localhost:8009, and its MCP comparison endpoint is
-http://192.168.5.157:8766/mcp. The original Kev MCP remains on port 8765.
-Both MCP adapters follow the user's existing blank-token LAN configuration.
-No cryptocurrency exchange connection or order execution is added.
+Gutsy is an optional CPU backend that can run separately from a Kev service.
+Its model API listens on port 8009 inside the Compose network, and its MCP
+endpoint is exposed on port 8766 by default. The original Kev MCP uses port
+8765. No cryptocurrency exchange connection or order execution is added.
 
 ## Pinned installation
 
@@ -19,10 +18,10 @@ is upstream Apache 2.0. The downloaded runtime README accompanies its source.
 ## Standalone deployment on another host
 
 On Linux (Python 3.11+), run `python3 scripts/download-gutsy.py`. On Windows,
-the existing PowerShell downloader also works. In a private .env, set
-KEV_MCP_BIND_HOST=0.0.0.0, KEV_MCP_AUTH_TOKEN=, and
-GUTSY_MCP_ALLOWED_HOSTS=192.168.5.232:8766,localhost:8766,127.0.0.1:8766,localhost:8765,127.0.0.1:8765
-for the .232 deployment. GUTSY_MCP_PORT defaults to 8766.
+run `scripts/download-gutsy.ps1`. For remote MCP clients, configure a private
+`.env` with `KEV_MCP_BIND_HOST=0.0.0.0`, a bearer token, and an exact
+`GUTSY_MCP_ALLOWED_HOSTS` entry for the host and port clients use.
+`GUTSY_MCP_PORT` defaults to 8766.
 Use `docker compose -p gutsy-advisory -f compose.gutsy.yaml up -d --build`.
 This standalone file requires neither a Kev image nor CUDA/cache volumes.
 It starts only Gutsy and its adapter under a separate project name.
@@ -66,24 +65,19 @@ insufficient_information, and tool selection returns no suggested tool. This
 is a largest-mass comparison, not a trading confidence threshold. The returned
 top_probability still describes the conditional model choice, which can differ
 from the final advisory suggestion; inspect the rejection fields alongside it.
-No calibration on the user's trading task has been established.
+No calibration on the target trading task has been established.
 
 ## Verification and evaluation
 
-The adapter test suite passed 95 tests. Actual HTTP MCP discovery and
-missing/stale context checks passed against the Gutsy container. A fresh
-synthetic advisory fixture returned insufficient_information, with conditional
-probability 0.494729, rejection 0.000102 and model latency about 1.82 seconds.
-This installation fixture is not a trading benchmark.
+The automated test suite covers adapter behavior. Validate HTTP MCP discovery,
+missing/stale context handling, and a synthetic advisory fixture against the
+running container before changing client configuration. Synthetic fixtures
+are smoke checks, not trading benchmarks.
 
-Both backends selected insufficient_information for three additional synthetic
-fixtures explicitly missing spread, account exposure or transaction costs.
-Gutsy's reject probabilities were approximately 0.00009: these abstentions used
-the explicit insufficient-information option, not its separate reject slot.
-In another synthetic two-option case where neither action was permitted,
-Gutsy's reject was 0.836964 despite a conditional option probability of 0.674922.
-That demonstrates why reading the conditional choice alone would be misleading.
-These are smoke checks, not broad abstention accuracy estimates.
+The adapter preserves Gutsy's explicit insufficient-information option and
+separate rejection output. Read both conditional and unconditional probability
+fields; the most likely conditional choice may differ from the final advisory
+suggestion. Smoke tests do not establish broad abstention accuracy.
 
 scripts/compare-gutsy.py evaluates the same fixed Project23 dataset and prompts
 against local Kev 4B and CPU Gutsy, alternating call order. It verifies the
